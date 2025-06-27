@@ -1,26 +1,14 @@
 {
   "name": "cngflow",
   "version": 2,
-  "builds": [
-    {
-      "src": "public/**",
-      "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/public/$1"
-    }
-  ],
   "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/public/$1"
-    },
     {
       "source": "/",
       "destination": "/public/index.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/public/$1"
     }
   ]
 }
