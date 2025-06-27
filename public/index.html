@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CNGFlow - Smart CNG Station Finder</title>
+    <meta name="description" content="Real-time CNG pump queue status. Save time by finding empty CNG stations nearby.">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#00A652">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header glass">
+            <div class="header-content">
+                <div class="title-section">
+                    <h1 class="app-title">
+                        <span class="logo">CNG</span>
+                        Flow
+                    </h1>
+                    <p class="app-tagline">Real-time queue tracking for smart refueling</p>
+                </div>
+                <div class="header-actions">
+                    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+                        <svg class="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+                    <button class="location-btn" id="locate-me">
+                        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M12 1v6m0 6v6m11-11h-6m-6 0H1"></path>
+                        </svg>
+                        <span class="text">Near Me</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Search Bar -->
+        <div class="search-section">
+            <div class="search-container">
+                <input 
+                    type="text" 
+                    id="search-input" 
+                    placeholder="Search area, landmark or pump name..."
+                    class="search-input"
+                >
+                <button class="search-btn" id="search-btn">
+                    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="view-toggle">
+                <button class="view-btn active" data-view="map">
+                    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon>
+                        <line x1="9" y1="3" x2="9" y2="18"></line>
+                        <line x1="15" y1="6" x2="15" y2="21"></line>
+                    </svg>
+                    Map
+                </button>
+                <button class="view-btn" data-view="list">
+                    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="8" y1="6" x2="21" y2="6"></line>
+                        <line x1="8" y1="12" x2="21" y2="12"></line>
+                        <line x1="8" y1="18" x2="21" y2="18"></line>
+                        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                        <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                    </svg>
+                    List
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Map View -->
+            <div id="map-view" class="view-container active">
+                <div id="map"></div>
+                
+                <!-- Map Legend -->
+                <div class="map-legend">
+                    <h3>Queue Status</h3>
+                    <div class="legend-item">
+                        <span class="status-dot green"></span>
+                        <span>No Queue (0-5)</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="status-dot yellow"></span>
+                        <span>Moderate (6-15)</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="status-dot red"></span>
+                        <span>Long Queue (15+)</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="status-dot gray"></span>
+                        <span>No Recent Update</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- List View -->
+            <div id="list-view" class="view-container">
+                <div class="filter-bar">
+                    <select id="sort-by" class="filter-select">
+                        <option value="distance">Nearest First</option>
+                        <option value="queue">Shortest Queue</option>
+                        <option value="updated">Recently Updated</option>
+                    </select>
+                    <select id="filter-status" class="filter-select">
+                        <option value="all">All Pumps</option>
+                        <option value="green">No Queue</option>
+                        <option value="yellow">Moderate Queue</option>
+                        <option value="red">Long Queue</option>
+                    </select>
+                </div>
+                <div id="pumps-list" class="pumps-list"></div>
+            </div>
+        </main>
+
+        <!-- Update Queue Modal -->
+        <div id="update-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Update Queue Status</h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <h3 id="pump-name"></h3>
+                    <p class="update-prompt">How many vehicles are in queue?</p>
+                    
+                    <div class="queue-selector">
+                        <button class="queue-btn" data-queue="0">
+                            <span class="label">No Queue</span>
+                            <span class="count">0 vehicles</span>
+                        </button>
+                        <button class="queue-btn" data-queue="5">
+                            <span class="label">Short</span>
+                            <span class="count">1-5 vehicles</span>
+                        </button>
+                        <button class="queue-btn" data-queue="10">
+                            <span class="label">Moderate</span>
+                            <span class="count">6-15 vehicles</span>
+                        </button>
+                        <button class="queue-btn" data-queue="20">
+                            <span class="label">Long</span>
+                            <span class="count">15+ vehicles</span>
+                        </button>
+                        <button class="queue-btn" data-queue="30">
+                            <span class="label">Very Long</span>
+                            <span class="count">30+ vehicles</span>
+                        </button>
+                    </div>
+
+                    <div class="additional-info">
+                        <label>
+                            <input type="checkbox" id="pump-closed">
+                            Pump is closed
+                        </label>
+                        <label>
+                            <input type="checkbox" id="low-pressure">
+                            Low pressure issue
+                        </label>
+                    </div>
+
+                    <textarea 
+                        id="update-notes" 
+                        placeholder="Any additional info? (optional)"
+                        class="update-notes"
+                    ></textarea>
+
+                    <button id="submit-update" class="submit-btn">
+                        Submit Update
+                        <span class="points">+10 points</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pump Details Modal -->
+        <div id="details-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="detail-pump-name"></h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="pump-status">
+                        <div class="status-circle" id="detail-status"></div>
+                        <div class="status-info">
+                            <p class="queue-text" id="detail-queue"></p>
+                            <p class="update-time" id="detail-update-time"></p>
+                        </div>
+                    </div>
+
+                    <div class="pump-info">
+                        <div class="info-item">
+                            <span class="icon">📍</span>
+                            <span id="detail-address"></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="icon">🕐</span>
+                            <span id="detail-hours"></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="icon">📱</span>
+                            <span id="detail-phone"></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="icon">💳</span>
+                            <span id="detail-payment"></span>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="action-btn" id="navigate-btn">
+                            <span class="icon">🧭</span>
+                            Navigate
+                        </button>
+                        <button class="action-btn" id="update-queue-btn">
+                            <span class="icon">✏️</span>
+                            Update Queue
+                        </button>
+                        <button class="action-btn" id="favorite-btn">
+                            <span class="icon">⭐</span>
+                            Add to Favorites
+                        </button>
+                    </div>
+
+                    <div class="recent-updates">
+                        <h3>Recent Updates</h3>
+                        <div id="updates-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button class="nav-btn active" data-page="home">
+                <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+                <span class="label">Home</span>
+            </button>
+            <button class="nav-btn" data-page="favorites">
+                <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+                <span class="label">Saved</span>
+            </button>
+            <button class="nav-btn update-cta" data-page="update">
+                <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span class="label">Update</span>
+            </button>
+            <button class="nav-btn" data-page="history">
+                <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+                <span class="label">Activity</span>
+            </button>
+            <button class="nav-btn" data-page="profile">
+                <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span class="label">Profile</span>
+            </button>
+        </nav>
+
+        <!-- Notification Toast -->
+        <div id="notification" class="notification"></div>
+        
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay">
+            <div class="loading-spinner">
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+                <span class="loading-text">Loading...</span>
+            </div>
+        </div>
+        
+        <!-- Pull to Refresh Indicator -->
+        <div id="pull-to-refresh" class="pull-to-refresh">
+            <div class="pull-arrow">↓</div>
+            <span class="pull-text">Pull to refresh</span>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

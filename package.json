@@ -1,0 +1,22 @@
+{
+  "name": "cngflow",
+  "version": "1.0.0",
+  "description": "Real-time CNG station queue tracking app",
+  "main": "public/index.html",
+  "scripts": {
+    "dev": "cd public && python3 -m http.server 8000",
+    "build": "echo 'No build required for static site'",
+    "start": "echo 'Static site ready'"
+  },
+  "keywords": [
+    "cng",
+    "queue-tracking",
+    "real-time",
+    "india",
+    "fuel",
+    "maps"
+  ],
+  "author": "Deepanshu Sharma",
+  "license": "MIT",
+  "homepage": "https://cngflow.vercel.app"
+}
